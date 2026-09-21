@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -17,7 +18,7 @@ from typer.testing import CliRunner, Result
 from specguard import api
 from specguard.cli import app
 
-runner = CliRunner()
+runner = CliRunner()  # colour is disabled for the whole run in tests/conftest.py
 GOOD = str(FIXTURES / "compliant_report.md")
 BAD = str(FIXTURES / "noncompliant_report.md")
 SPEC = str(FIXTURES / "valid_spec.yml")
@@ -47,7 +48,8 @@ class TestBasics:
         assert result.stdout.startswith("specguard 0.1.0")
 
     def test_audit_help_documents_exit_thresholds(self) -> None:
-        out = run("audit", "--help").stdout
+        # CI forces colour, so remove ANSI escape codes before matching.
+        out = re.sub(r"\[[0-9;]*m", "", run("audit", "--help").stdout)
         assert "--fail-on" in out and "--format" in out and "--output" in out
 
 
