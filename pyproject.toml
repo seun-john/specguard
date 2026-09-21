@@ -62,6 +62,7 @@ include = ["src", "tests", "examples", "docs", "README.md", "LICENSE", "CHANGELO
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]  # lets `import tests.helpers` work with a bare `pytest`
 addopts = "-ra --strict-markers"
 
 [tool.coverage.run]
