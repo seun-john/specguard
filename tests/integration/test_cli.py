@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+import sysconfig
 from pathlib import Path
 
 import pytest
@@ -357,7 +358,9 @@ class TestAsRealProcess:
         assert json.loads(proc.stdout.decode("utf-8"))["summary"]["total_requirements"] == 7
 
     def test_console_script_exists(self) -> None:
-        script = Path(sys.executable).parent / ("specguard.exe" if os.name == "nt" else "specguard")
-        assert script.exists()
+        # The scripts folder is not beside python.exe in every install layout (venv vs system).
+        name = "specguard.exe" if os.name == "nt" else "specguard"
+        script = Path(sysconfig.get_path("scripts")) / name
+        assert script.exists(), script
         proc = subprocess.run([str(script), "--version"], capture_output=True, timeout=60)
         assert proc.returncode == 0
