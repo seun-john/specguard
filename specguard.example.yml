@@ -1,0 +1,70 @@
+# SpecGuard specification.
+#
+# Test a document against it:   specguard audit report.docx --spec specguard.yml
+# Check this file for mistakes: specguard validate specguard.yml
+# List the available checkers:  specguard rules
+#
+# Every requirement has an id, a description, a severity and either a `checker`
+# (a rule SpecGuard can test) or a verification_type of semantic, manual or
+# unsupported (SpecGuard reports those as UNVERIFIED and never as a pass).
+
+version: 1
+name: My document requirements
+
+requirements:
+  # Length: the document must not be longer than 3000 words.
+  - id: SG001
+    description: The document must not exceed 3000 words
+    category: count
+    severity: critical
+    checker: word_count
+    parameters:
+      max: 3000
+      # exclude_sections: [References]   # leave a section out of the count
+
+  # Punctuation: only the marks you list are checked.
+  - id: SG002
+    description: Do not use em dashes
+    category: style
+    severity: major
+    checker: forbidden_text
+    parameters:
+      values: ["—"]
+
+  # Structure: these headings must exist.
+  - id: SG003
+    description: Include Introduction and Conclusion sections
+    category: structure
+    severity: major
+    checker: required_section
+    parameters:
+      headings: [Introduction, Conclusion]
+
+  # Wording: phrases that must never appear.
+  - id: SG004
+    description: No placeholder text
+    category: content
+    severity: major
+    checker: forbidden_text
+    parameters:
+      values: [TODO, TBD, "lorem ipsum"]
+      whole_word: true
+
+  # A subjective requirement. SpecGuard cannot test it, so it is reported as
+  # UNVERIFIED. It is never marked PASS.
+  - id: SG005
+    description: Write in a clear, engaging style
+    category: style
+    severity: minor
+    verification_type: semantic
+
+  # Protected text: it must appear exactly as given. Put the approved wording in
+  # a file next to this one, then uncomment.
+  #
+  # - id: SG006
+  #   description: Preserve the approved research questions exactly
+  #   category: preservation
+  #   severity: critical
+  #   checker: preserve_text
+  #   parameters:
+  #     baseline_file: approved_questions.txt

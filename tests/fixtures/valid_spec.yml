@@ -1,0 +1,61 @@
+version: 1
+name: Community health report
+
+requirements:
+  - id: SG001
+    description: Report must be between 100 and 400 words
+    category: count
+    severity: critical
+    checker: word_count
+    parameters:
+      min: 100
+      max: 400
+
+  - id: SG002
+    description: Do not use em dashes
+    category: style
+    severity: major
+    checker: forbidden_punctuation
+    parameters:
+      marks: [em_dash]
+
+  - id: SG003
+    description: Include Introduction, Methodology and Conclusion
+    category: structure
+    severity: major
+    checker: required_section
+    parameters:
+      headings: [Introduction, Methodology, Conclusion]
+
+  - id: SG004
+    description: No placeholder text
+    category: content
+    severity: major
+    checker: forbidden_text
+    parameters:
+      values: [TODO, TBD]
+      whole_word: true
+      case_sensitive: true
+
+  - id: SG005
+    description: Preserve the approved research questions exactly
+    category: preservation
+    severity: critical
+    checker: preserve_text
+    parameters:
+      baseline_file: protected_questions.txt
+
+  - id: SG006
+    description: Cite at least three references
+    category: count
+    severity: minor
+    checker: element_count
+    parameters:
+      element: references
+      min: 3
+
+  - id: SG007
+    description: Write in a clear, engaging style
+    category: style
+    severity: minor
+    verification_type: semantic

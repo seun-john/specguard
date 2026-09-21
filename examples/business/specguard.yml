@@ -1,0 +1,56 @@
+# Rule pack for a business report.
+#
+#   specguard audit examples/business/quarterly_report.md --spec examples/business/specguard.yml
+
+version: 1
+name: Business report requirements
+
+requirements:
+  - id: BR001
+    description: The report must have an Executive Summary
+    category: structure
+    severity: major
+    checker: required_section
+    parameters:
+      headings: [Executive Summary]
+
+  - id: BR002
+    description: The report must not exceed 1500 words
+    category: count
+    severity: critical
+    checker: word_count
+    parameters:
+      max: 1500
+
+  - id: BR003
+    description: The report must include a Recommendations section
+    category: structure
+    severity: major
+    checker: required_section
+    parameters:
+      headings: [[Recommendation, Recommendations]]
+
+  - id: BR004
+    description: No internal placeholder text
+    category: content
+    severity: major
+    checker: forbidden_text
+    parameters:
+      values: [TODO, TBD, FIXME, XXX]
+      whole_word: true
+      case_sensitive: true
+
+  - id: BR005
+    description: No unfilled template fields such as [insert name]
+    category: content
+    severity: major
+    checker: forbidden_regex
+    parameters:
+      pattern: '\[(?:insert|add|tbc)[^\]]*\]'
+      flags: [ignorecase]
+
+  - id: BR006
+    description: Keep the tone confident and plain
+    category: style
+    severity: minor
+    verification_type: semantic

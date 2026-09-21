@@ -1,0 +1,51 @@
+# Rule pack for a project README.
+#
+#   specguard audit examples/coding/README.example.md --spec examples/coding/specguard.yml
+
+version: 1
+name: README requirements
+
+requirements:
+  - id: RD001
+    description: The README must have an Installation section
+    category: structure
+    severity: major
+    checker: required_section
+    parameters:
+      headings: [Installation]
+
+  - id: RD002
+    description: The README must have a Usage section
+    category: structure
+    severity: major
+    checker: required_section
+    parameters:
+      headings: [Usage]
+
+  - id: RD003
+    description: The README must include at least one code block
+    category: structure
+    severity: major
+    checker: element_count
+    parameters:
+      element: code_blocks
+      min: 1
+
+  - id: RD004
+    description: The README must not contain TODO
+    category: content
+    severity: major
+    checker: forbidden_text
+    parameters:
+      values: [TODO]
+      whole_word: true
+      case_sensitive: true
+
+  - id: RD005
+    description: The README must not exceed 400 words
+    category: count
+    severity: minor
+    checker: word_count
+    parameters:
+      max: 400
+      exclude_sections: [License]

@@ -1,0 +1,79 @@
+# Rule pack for a thesis chapter or research report.
+#
+#   specguard audit examples/academic/draft.md --spec examples/academic/specguard.yml
+#   specguard audit examples/academic/thesis_sample.docx --spec examples/academic/specguard.yml
+
+version: 1
+name: Academic report requirements
+
+requirements:
+  - id: AC001
+    description: The report must not exceed 3000 words (references excluded)
+    category: count
+    severity: critical
+    checker: word_count
+    parameters:
+      max: 3000
+      exclude_sections: [References]
+
+  - id: AC002
+    description: Do not use em dashes
+    category: style
+    severity: major
+    checker: forbidden_punctuation
+    parameters:
+      marks: [em_dash]
+
+  - id: AC003
+    description: Include Introduction, Methodology, Conclusion and References sections
+    category: structure
+    severity: major
+    checker: required_section
+    parameters:
+      headings:
+        - Introduction
+        - [Methodology, Methods]
+        - [Conclusion, Conclusions]
+        - [References, Bibliography]
+
+  - id: AC004
+    description: Preserve the approved research questions exactly
+    category: preservation
+    severity: critical
+    checker: preserve_text
+    parameters:
+      baseline_file: approved_questions.txt
+
+  - id: AC005
+    description: Do not use assistant-style meta-writing
+    category: content
+    severity: major
+    checker: forbidden_text
+    parameters:
+      values:
+        - as an ai
+        - in this essay, we will
+        - it is important to note that
+        - i hope this helps
+        - certainly!
+
+  - id: AC006
+    description: Cite at least five references
+    category: count
+    severity: minor
+    checker: element_count
+    parameters:
+      element: references
+      min: 5
+
+  - id: AC007
+    description: Use British English spelling
+    category: style
+    severity: minor
+    verification_type: semantic
+
+  - id: AC008
+    description: Maintain a formal academic tone
+    category: style
+    severity: minor
+    verification_type: semantic

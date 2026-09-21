@@ -1,0 +1,26 @@
+version: 1
+name: Broken specification
+
+requirements:
+  - id: SG001
+    description: Duplicate id one
+    checker: word_cuont
+    parameters:
+      max: 100
+
+  - id: SG001
+    description: Duplicate id two
+    severity: huge
+    checker: word_count
+    parameters:
+      maxx: 100
+
+  - id: SG003
+    description: Deterministic with no checker
+    verification_type: deterministic
+
+  - id: SG004
+    description: Bad regular expression
+    checker: forbidden_regex
+    parameters:
+      pattern: "(unclosed"
