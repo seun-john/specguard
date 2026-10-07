@@ -388,6 +388,153 @@ def mcp(
         server.run("streamable-http", host=host, port=port)
 
 
+# --------------------------------------------------------------------------------------
+# project-level audits: done, context, scope
+# --------------------------------------------------------------------------------------
+
+done_app = typer.Typer(help="Check whether a folder backs up a 'done' claim.", no_args_is_help=True)
+scope_app = typer.Typer(
+    help="Check which files changed, and whether that was allowed.", no_args_is_help=True
+)
+app.add_typer(done_app, name="done")
+app.add_typer(scope_app, name="scope")
+
+
+class ProjectFormat(str, Enum):
+    terminal = "terminal"
+    json = "json"
+    markdown = "markdown"
+
+
+def _emit_project(
+    report: Any, fmt: ProjectFormat, output: Path | None, fail_on_unverified: bool
+) -> None:
+    from specguard.project import render_project_report
+
+    text = render_project_report(report, fmt.value)
+    if output is not None:
+        _write_text(output, text)
+        err.print(f"Wrote {fmt.value} report to {output}")
+    else:
+        typer.echo(text, nl=False)
+    if report.failed() or (fail_on_unverified and report.has_unverified()):
+        raise typer.Exit(EXIT_FAILED)
+
+
+def _load_mapping(path: Path) -> dict[str, Any]:
+    from specguard.utils.yamlio import YamlLoadError, load_yaml_text
+
+    text, _ = decode_text(read_bytes_limited(path, 1024 * 1024), str(path))
+    try:
+        data = load_yaml_text(text)  # YAML is a superset of JSON, so both work
+    except YamlLoadError as exc:
+        raise SpecGuardError(f"{path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise SpecGuardError(f"{path} must contain a mapping at the top level")
+    return data
+
+
+@done_app.command("check")
+@handle_errors
+def done_check(
+    spec: Path = typer.Argument(
+        ..., help="Done-spec (YAML or JSON): files, scan_files, criteria, test_record."
+    ),
+    root: Path = typer.Option(
+        Path("."), "--root", help="Project folder the paths are relative to."
+    ),
+    format: ProjectFormat = typer.Option(ProjectFormat.terminal, "--format", "-f"),
+    output: Path | None = typer.Option(None, "--output", "-o"),
+    fail_on_unverified: bool = typer.Option(False, "--fail-on-unverified"),
+) -> None:
+    """Audit a folder against a done-spec. Exit 1 on any failure."""
+    from specguard.project import audit_done
+
+    _emit_project(audit_done(_load_mapping(spec), root), format, output, fail_on_unverified)
+
+
+@done_app.command(
+    "record", context_settings={"allow_extra_args": True, "ignore_unknown_options": True}
+)
+@handle_errors
+def done_record(
+    ctx: typer.Context,
+    output: Path = typer.Option(
+        Path("test-record.json"), "--output", "-o", help="Where to write the record."
+    ),
+    root: Path = typer.Option(Path("."), "--root"),
+    timeout: float = typer.Option(
+        600.0, "--timeout", help="Seconds before the command is stopped."
+    ),
+) -> None:
+    """Run a test command (after `--`) and write a tamper-evident record of what happened.
+
+    Example: specguard done record -o test-record.json -- python -m pytest -q
+    """
+    from specguard.project import capture_command
+
+    record = capture_command(ctx.args, root, output, timeout=timeout)
+    typer.echo(f"Recorded exit code {record['exit_code']}, counts {record['counts']} -> {output}")
+    if record["exit_code"] != 0:
+        raise typer.Exit(EXIT_FAILED)
+
+
+@app.command()
+@handle_errors
+def context(
+    root: Path = typer.Option(Path("."), "--root", help="Project folder to scan."),
+    target: str = typer.Option(
+        ".", "--target", help="Folder (inside root) the agent will work in."
+    ),
+    format: ProjectFormat = typer.Option(ProjectFormat.terminal, "--format", "-f"),
+    output: Path | None = typer.Option(None, "--output", "-o"),
+    fail_on_unverified: bool = typer.Option(False, "--fail-on-unverified"),
+) -> None:
+    """Lint AGENTS.md, CLAUDE.md and similar instruction files for conflicts and risks."""
+    from specguard.project import audit_context
+
+    _emit_project(audit_context(root, target), format, output, fail_on_unverified)
+
+
+@scope_app.command("snapshot")
+@handle_errors
+def scope_snapshot(
+    root: Path = typer.Option(Path("."), "--root"),
+    output: Path = typer.Option(
+        ..., "--output", "-o", help="Save the baseline outside the folder."
+    ),
+) -> None:
+    """Record file hashes before the work starts."""
+    import json
+
+    from specguard.project import manifest
+
+    data = manifest(root)
+    if output.resolve().is_relative_to(root.resolve()):
+        err.print("[yellow]Warning:[/yellow] the baseline is inside the audited folder.")
+    _write_text(output, json.dumps(data, indent=2, sort_keys=True) + "\n")
+    typer.echo(f"Recorded {len(data)} file(s) -> {output}")
+
+
+@scope_app.command("check")
+@handle_errors
+def scope_check(
+    baseline: Path = typer.Argument(..., help="Baseline from `specguard scope snapshot`."),
+    allow: list[str] = typer.Option(
+        ..., "--allow", help="Path pattern that may change. Repeatable."
+    ),
+    protect: list[str] = typer.Option([], "--protect", help="Path pattern that must not change."),
+    root: Path = typer.Option(Path("."), "--root"),
+    format: ProjectFormat = typer.Option(ProjectFormat.terminal, "--format", "-f"),
+    output: Path | None = typer.Option(None, "--output", "-o"),
+) -> None:
+    """Compare the folder with a baseline and flag out-of-scope or protected changes."""
+    from specguard.project import audit_scope, load_baseline
+
+    report = audit_scope(root, load_baseline(baseline), allow, protect)
+    _emit_project(report, format, output, False)
+
+
 def main() -> None:
     """Console-script entry point."""
     for stream in (sys.stdout, sys.stderr):

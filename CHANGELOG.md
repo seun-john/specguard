@@ -4,6 +4,14 @@ All notable changes are recorded here. This project follows [Semantic Versioning
 
 ## Unreleased
 
+## 0.2.0
+
+### Added
+
+- `specguard done record` and `specguard done check`: run a test command and keep a tamper-evident record, then check that a folder's files, criteria and test record support a claim of completion. Stale, edited or count-less records fail.
+- `specguard context`: lint AGENTS.md, CLAUDE.md, GEMINI.md, .cursorrules and Copilot instruction files for duplicates, contradictions, bloat, broken `@` imports and credential-disclosure instructions.
+- `specguard scope snapshot` and `specguard scope check`: compare a folder with a hash baseline against allowed and protected path patterns.
+
 ## 0.1.0
 
 First usable release.

@@ -46,7 +46,7 @@ class TestBasics:
     def test_version(self) -> None:
         result = run("--version")
         assert result.exit_code == 0
-        assert result.stdout.startswith("specguard 0.1.0")
+        assert result.stdout.startswith("specguard 0.2.0")
 
     def test_audit_help_documents_exit_thresholds(self) -> None:
         # CI forces colour, so remove ANSI escape codes before matching.

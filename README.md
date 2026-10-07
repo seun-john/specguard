@@ -212,6 +212,51 @@ Anything else that reads like an instruction is kept and classified, never guess
 
 "Keep it below 3,000 words" is read strictly: at most 2,999. Review the output before relying on it; `--explain` shows how each sentence was read.
 
+## Project checks: done, context, scope
+
+Three commands audit a folder instead of one document. They use the same statuses as `audit` (PASS, FAIL, WARNING, UNVERIFIED) and exit with 1 on any FAIL.
+
+**`specguard done`: is the work really finished?**
+
+```bash
+specguard done record -o test-record.json -- python -m pytest -q   # runs the command itself
+specguard done check done.yml --root .
+```
+
+```yaml
+# done.yml
+files:
+  - path: dist/report.docx          # must exist and be non-empty
+  - path: data/results.json
+    format: json                    # must parse
+    sha256: 3b1f...                 # optional exact hash
+scan_files: [src/app.py]            # TODO, FIXME, NotImplementedError and skip markers warn
+criteria:
+  - text: Output matches the approved template
+    evidence_files: [docs/template-check.md]   # evidence exists, but a person must judge it
+test_record: test-record.json
+```
+
+`record` runs your test command (no shell) and stores its exit code, parsed pass/fail/skip counts, timings and a hash of every file in the folder. `check` then refuses to call the tests passing when the record is stale (a file changed since), was edited, shows failures, or has no readable test counts. Without a record the result is UNVERIFIED, never PASS. The record is tamper-evident, not tamper-proof: anyone who can write to the folder can forge both the record and its hash.
+
+**`specguard context`: are the agent instructions consistent?**
+
+```bash
+specguard context --root . --target src/api
+```
+
+Finds `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursorrules` and Copilot instruction files that apply to the target folder, then reports duplicate rules, always/never contradictions (including "must", "do not" and "don't"), files over 16,000 characters, `@file` imports that do not exist, and lines that tell an agent to disclose credentials. It matches literal wording, so paraphrased contradictions are not found.
+
+**`specguard scope`: did the change stay in bounds?**
+
+```bash
+specguard scope snapshot -o ../baseline.json
+# ... the work happens ...
+specguard scope check ../baseline.json --allow "src/*" --protect "approved/*"
+```
+
+Lists every added, modified and deleted file and marks each as allowed, outside the scope or protected. Dependency files such as `package.json` and `pyproject.toml` get an extra warning. Patterns use `fnmatch` (`*` also crosses `/`); a pattern ending in `/` covers a folder. Keep the baseline outside the folder.
+
 ## PASS, FAIL, WARNING, UNVERIFIED, ERROR
 
 | Status | Meaning |
