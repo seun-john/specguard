@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/logo.png" alt="SpecGuard logo" width="420">
+</p>
+
 # SpecGuard
 
 **Verify that AI-generated work actually follows the instructions.**
