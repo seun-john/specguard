@@ -84,6 +84,10 @@ def render_terminal(report: AuditReport, console: Console, *, verbose: bool = Fa
     console.print()
     _field(console, "Compliance among verified requirements", _pct(s.compliance_score), "bold")
     _field(console, "Verification coverage", _pct(s.verification_coverage), "bold")
+    if report.coverage is not None:
+        _field(console, "Coverage", report.coverage.describe(), "bold")
+        for note in report.coverage.notes:
+            console.print(Text(f"  Note: {note}", style="yellow"))
     if s.verified < s.total_requirements:
         console.print(
             Text(

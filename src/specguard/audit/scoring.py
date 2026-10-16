@@ -17,13 +17,55 @@ Either value is None (not 100%) when nothing was verified.
 from __future__ import annotations
 
 from specguard.models.requirement import VerificationType
-from specguard.models.result import AuditEntry, Status, Summary
+from specguard.models.result import AuditEntry, Coverage, Status, Summary
 
 WARNING_CREDIT = 0.5
 
 
 def _pct(value: float) -> float:
     return round(value * 100, 1)
+
+
+_UNVERIFIED_REASON = {
+    VerificationType.SEMANTIC: "semantic_judgement",
+    VerificationType.MANUAL: "human_judgement",
+}
+
+
+def compute_coverage(
+    entries: list[AuditEntry], disabled: int = 0, not_extracted: int = 0
+) -> Coverage:
+    """The shared coverage block: how many requirements were actually tested, and why not.
+
+    `not_extracted` is the number of sentences of the original brief that produced no
+    requirement at all. They are not items (nothing was written to test), so they appear
+    in `notes` rather than in the counts.
+    """
+    reasons: dict[str, int] = {}
+    decided = 0
+    for e in entries:
+        status = e.result.status
+        if status.is_verified:
+            decided += 1
+        elif status is Status.ERROR:
+            reasons["checker_error"] = reasons.get("checker_error", 0) + 1
+        else:
+            reason = _UNVERIFIED_REASON.get(e.requirement.verification_type, "no_checker")
+            reasons[reason] = reasons.get(reason, 0) + 1
+    notes = []
+    if not_extracted:
+        notes.append(
+            f"{not_extracted} sentence(s) of the original instructions became no requirement "
+            "and were not tested (listed under not_extracted in the specification)."
+        )
+    return Coverage(
+        items=len(entries),
+        decided=decided,
+        undecided=len(entries) - decided,
+        reasons=dict(sorted(reasons.items())),
+        suppressed=disabled,
+        notes=notes,
+    )
 
 
 def compute_summary(entries: list[AuditEntry], disabled: int = 0) -> Summary:

@@ -18,6 +18,9 @@ class Specification(BaseModel):
     name: str = "Untitled specification"
     description: str | None = None
     requirements: list[Requirement] = Field(default_factory=list)
+    # Sentences of the original instructions that `specguard extract` turned into no
+    # requirement. Kept so an audit can say how much of the brief was never tested.
+    not_extracted: list[str] = Field(default_factory=list)
 
     def enabled_requirements(self) -> list[Requirement]:
         return [r for r in self.requirements if r.enabled]

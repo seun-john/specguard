@@ -41,6 +41,13 @@ def dump_specification(spec: Specification, header: str = "") -> str:
     out.append("version: 1")
     out.append("name: " + yaml.safe_dump(spec.name, allow_unicode=True, width=1000).splitlines()[0])
     out.append("")
+    if spec.not_extracted:
+        block = yaml.safe_dump(
+            {"not_extracted": spec.not_extracted}, allow_unicode=True, width=100, sort_keys=False
+        )
+        out.append("# Sentences that became no requirement and are not tested.")
+        out.append(block.rstrip())
+        out.append("")
     out.append("requirements:")
     for req in spec.requirements:
         body = yaml.safe_dump(

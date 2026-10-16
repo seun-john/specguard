@@ -120,6 +120,37 @@ class Summary(BaseModel):
     verification_coverage: float | None
 
 
+class Coverage(BaseModel):
+    """How much of the specification could be judged (the shared coverage block).
+
+    `decided + undecided == items` and the `reasons` counts add up to `undecided`.
+    `suppressed` counts requirements switched off in the specification; they are not items.
+    """
+
+    unit: str = "requirements"
+    items: int
+    decided: int
+    undecided: int
+    reasons: dict[str, int] = Field(default_factory=dict)
+    suppressed: int = 0
+    notes: list[str] = Field(default_factory=list)
+
+    @property
+    def decided_share(self) -> float | None:
+        """Percent of items decided, or None when there were no items."""
+        return round(100 * self.decided / self.items, 1) if self.items else None
+
+    def describe(self) -> str:
+        """One line for people: `decided 20 of 33 requirements; 13 could not be checked (...)`."""
+        text = f"decided {self.decided} of {self.items} {self.unit}"
+        if self.undecided:
+            why = ", ".join(
+                f"{k} {v}" for k, v in sorted(self.reasons.items(), key=lambda kv: -kv[1])
+            )
+            text += f"; {self.undecided} could not be checked ({why})"
+        return text
+
+
 class AuditReport(BaseModel):
     """Everything an audit produced."""
 
@@ -131,6 +162,7 @@ class AuditReport(BaseModel):
     specification_name: str
     document: DocumentInfo
     summary: Summary
+    coverage: Coverage | None = None
     entries: list[AuditEntry]
     notices: list[str] = Field(default_factory=list)
 

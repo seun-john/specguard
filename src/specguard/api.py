@@ -45,7 +45,9 @@ def extract_from_text(instructions: str) -> ExtractionResult:
 
 def specification_from_extraction(result: ExtractionResult, name: str) -> Specification:
     """Wrap extracted requirements in a Specification."""
-    return Specification(name=name, requirements=result.requirements)
+    return Specification(
+        name=name, requirements=result.requirements, not_extracted=list(result.skipped)
+    )
 
 
 def validate_data(

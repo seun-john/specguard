@@ -67,6 +67,7 @@ def render_markdown(report: AuditReport) -> str:
         f"- **Requirements:** {s.total_requirements}",
         f"- **Compliance among verified requirements:** {_pct(s.compliance_score)}",
         f"- **Verification coverage:** {_pct(s.verification_coverage)}",
+        *([f"- **Coverage:** {report.coverage.describe()}"] if report.coverage else []),
         "",
         "| Status | Count |",
         "| --- | ---: |",
@@ -79,8 +80,9 @@ def render_markdown(report: AuditReport) -> str:
             "not tested. They are not counted as passes.",
             "",
         ]
-    out += [f"> Note: {n}" for n in report.notices]
-    if report.notices:
+    notes = [*report.notices, *(report.coverage.notes if report.coverage else [])]
+    out += [f"> Note: {n}" for n in notes]
+    if notes:
         out.append("")
 
     order = [Status.FAIL, Status.ERROR, Status.WARNING, Status.UNVERIFIED]

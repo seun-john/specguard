@@ -30,6 +30,7 @@ EXIT_FAILED = 1
 EXIT_BAD_SPEC = 2
 EXIT_FILE_ERROR = 3
 EXIT_INTERNAL = 4
+EXIT_LOW_COVERAGE = 5
 
 DEFAULT_SPEC = "specguard.yml"
 
@@ -220,6 +221,11 @@ def extract(
         f"Found {len(spec.requirements)} requirement(s): {checked} testable, "
         f"{len(spec.requirements) - checked} that SpecGuard cannot test (they will be UNVERIFIED)."
     )
+    if result.skipped:
+        err.print(
+            f"{len(result.skipped)} sentence(s) became no requirement and will not be tested "
+            "(listed under not_extracted in the specification; use --explain to see them)."
+        )
     if not spec.requirements:
         err.print(
             "[yellow]No requirements were recognised. Write one instruction per sentence.[/yellow]"
@@ -287,6 +293,14 @@ def audit(
     fail_on_unverified: bool = typer.Option(
         False, "--fail-on-unverified", help="Also exit with 1 if any requirement was not tested."
     ),
+    min_coverage: float | None = typer.Option(
+        None,
+        "--min-coverage",
+        min=0,
+        max=100,
+        help="Exit with 5 if fewer than this percent of requirements could be tested, "
+        "when nothing failed. A failure still exits 1.",
+    ),
     verbose: bool = typer.Option(
         False, "--verbose", "-v", help="Show evidence for passing requirements too."
     ),
@@ -318,6 +332,11 @@ def audit(
 
     if blocking_entries(report, fail_on.value, fail_on_unverified=fail_on_unverified):
         raise typer.Exit(EXIT_FAILED)
+    share = report.coverage.decided_share if report.coverage else None
+    if min_coverage is not None and (share is None or share < min_coverage):
+        shown = "no requirements" if share is None else f"{share:g}% decided"
+        err.print(f"Coverage {shown} is below --min-coverage {min_coverage:g}.")
+        raise typer.Exit(EXIT_LOW_COVERAGE)
 
 
 # --------------------------------------------------------------------------------------

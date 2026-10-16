@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from specguard import __version__
-from specguard.audit.scoring import compute_summary
+from specguard.audit.scoring import compute_coverage, compute_summary
 from specguard.audit.semantic import SemanticVerifier
 from specguard.audit.validation import check_requirements
 from specguard.models.document import Document
@@ -68,6 +68,7 @@ class AuditEngine:
             specification_name=specification.name,
             document=self._document_info(document),
             summary=compute_summary(entries, disabled),
+            coverage=compute_coverage(entries, disabled, len(specification.not_extracted)),
             entries=entries,
             notices=self._notices(document, disabled),
         )

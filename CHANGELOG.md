@@ -4,6 +4,12 @@ All notable changes are recorded here. This project follows [Semantic Versioning
 
 ## Unreleased
 
+### Added
+
+- A `coverage` block in every audit report (JSON, Markdown and terminal): requirements decided and undecided, the reasons (`semantic_judgement`, `human_judgement`, `no_checker`, `checker_error`), and the number switched off. No existing field changed.
+- `specguard audit --min-coverage PCT`: exit code 5 when nothing failed but fewer than PCT percent of requirements could be tested.
+- `specguard extract` keeps the sentences that became no requirement as `not_extracted` in the specification, says how many on screen, and the audit notes how many were never tested.
+
 ## 0.2.0
 
 ### Added

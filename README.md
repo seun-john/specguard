@@ -167,6 +167,7 @@ Without `--spec`, SpecGuard reads `specguard.yml` in the current folder.
 | 2 | Invalid specification. |
 | 3 | File or read error (missing, unreadable, unsupported type, malformed DOCX). |
 | 4 | Internal error. |
+| 5 | `--min-coverage PCT` was given, nothing failed, and fewer than PCT percent of the requirements could be tested. |
 
 `--fail-on` accepts `critical`, `major`, `minor`, `any` (default) and `none`. `any` fails on any FAIL or ERROR; advisory violations (`severity: info`) are WARNINGs and never fail the run. An ERROR (a checker that could not run) counts as a failure, because an untested requirement cannot be assumed to pass.
 
@@ -285,6 +286,27 @@ Verification coverage: 72%
 ```
 
 If nothing was tested, both are shown as "n/a", not 100%. The raw counts are always reported too.
+
+### The coverage block
+
+Every report states how much could be judged, in words and in the JSON `coverage` object (the layout shared by all the Trust Tools):
+
+```text
+Coverage: decided 20 of 33 requirements; 13 could not be checked (semantic_judgement 9, human_judgement 2, no_checker 2)
+```
+
+```json
+"coverage": {"unit": "requirements", "items": 33, "decided": 20, "undecided": 13,
+             "reasons": {"semantic_judgement": 9, "human_judgement": 2, "no_checker": 2},
+             "suppressed": 1, "notes": []}
+```
+
+- `decided` counts PASS, FAIL and WARNING. `undecided` counts UNVERIFIED (reason `semantic_judgement`, `human_judgement` or `no_checker`) and ERROR (`checker_error`). The reasons add up to `undecided`.
+- `suppressed` is the number of requirements switched off with `enabled: false`; they are not items.
+- `specguard extract` records the sentences of the instructions that became no requirement under `not_extracted:` in the specification, and the audit's `notes` says how many there were. Those sentences are never tested, and the requirement counts above do not include them, so read the note with the numbers.
+- `--min-coverage PCT` turns low coverage into exit code 5, so a pipeline cannot read "no failures" when most of the specification was never tested. A real failure still exits 1.
+
+Decided is not the same as correct: coverage says how much was examined, not how accurate the result is.
 
 ## Use it in CI
 
