@@ -30,6 +30,8 @@ parameters:
 
 `required_text` adds `require: all | any`. Spaces in a phrase match any whitespace, so a phrase still matches across a hard line wrap. Markdown emphasis and links are removed before matching.
 
+`required_text` also takes `within: first_paragraph | last_paragraph` (default `document`). A paragraph here is body text: headings, list items, tables and code blocks do not count. If the document has no body paragraph the result is UNVERIFIED.
+
 ## forbidden_regex / required_regex
 
 ```yaml
@@ -76,6 +78,19 @@ parameters:
 ```
 
 Numbering such as `2.1` or `Chapter 3:` and a trailing colon are ignored when comparing. Only real headings count: `#` in Markdown, Heading styles in Word, and (in plain text) `#`, an underline of `=`/`-`, numbering, or ALL CAPS. In plain text a short standalone line with no full stop is also accepted, with a note and reduced confidence. On failure the report lists the headings that do exist and suggests near matches.
+
+`ordered: true` (with `require: all`) also requires the headings to appear in the order listed; a missing heading is still reported as missing, and an out-of-order set fails with the order that was found.
+
+## spelling_variant
+
+```yaml
+checker: spelling_variant
+parameters:
+  variant: british             # or american
+  allow: [Color]               # optional: words to ignore, such as a proper name
+```
+
+A word-list check, not a spell checker. It looks for spellings of the *other* variant from a built-in list of common pairs (`color`/`colour`, `center`/`centre`, `analyze`/`analyse`, `traveled`/`travelled`, and `-ise`/`-ize` stems), including common endings. A failure names the words and places. A pass has confidence 0.75, because words that are not on the list are not examined, and the evidence says how many pairs were checked. `-ize` is never reported in a British document (Oxford spelling); `-ise` is reported in an American one. Matches inside double quotation marks are not counted, because a title or quotation keeps its own spelling; they are listed in the evidence and in `details.ignored_in_quotes`.
 
 ## forbidden_punctuation
 

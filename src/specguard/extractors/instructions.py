@@ -579,7 +579,7 @@ def match_forbidden_text(clause: str, chunk: _Chunk) -> list[Draft] | None:
 
 
 _PRESERVE_VERB = r"(?:preserve|keep|retain|maintain|reproduce|copy|quote|include|use|leave|reuse)"
-_EXACT_TAIL = r"(?:exactly|verbatim|unchanged|word[- ]for[- ]word|as (?:is|written|given|provided|supplied|approved))"
+_EXACT_TAIL = rf"(?:exactly(?!\s+(?:{NUM})\b)|verbatim|unchanged|word[- ]for[- ]word|as (?:is|written|given|provided|supplied|approved))"
 _PRESERVE_RE = re.compile(
     rf"\b{_PRESERVE_VERB}\s+(?:the\s+)?(?P<obj>[\w\s'’,-]{{1,70}}?)\s+{_EXACT_TAIL}", I
 )
@@ -1131,10 +1131,268 @@ def match_file_type(clause: str, chunk: _Chunk) -> list[Draft] | None:
     return None
 
 
+# --------------------------------------------------------------------------------------
+# Order, stated facts, spelling, placeholders, position of a term, citation style
+# --------------------------------------------------------------------------------------
+
+_CAP = r"(?-i:[A-Z])"
+_SECTION_NAME = rf"{_CAP}[\w'’&-]*(?:\s+[\w'’&-]+){{0,4}}?"
+_ORDER_BEFORE_RE = re.compile(
+    rf"\b(?:put|place|position|keep|have|list|present)\s+(?:the\s+)?(?P<a>{_SECTION_NAME})\s+"
+    rf"(?:section|heading|chapter)\s+(?P<rel>before|after|ahead of|following)\s+(?:the\s+)?"
+    rf"(?P<b>{_SECTION_NAME})(?:\s+(?:section|heading|chapter))?\s*$",
+    I,
+)
+_ORDER_MODAL_RE = re.compile(
+    rf"^(?:the\s+)?(?P<a>{_SECTION_NAME})\s+(?:section|heading|chapter)\s+"
+    rf"(?:must|should|needs? to|has to|shall)\s+(?:come|appear|go|be placed|be put|be)\s+"
+    rf"(?P<rel>before|after|ahead of)\s+(?:the\s+)?(?P<b>{_SECTION_NAME})"
+    rf"(?:\s+(?:section|heading|chapter))?\s*$",
+    I,
+)
+
+
+def match_section_order(clause: str, chunk: _Chunk) -> list[Draft] | None:
+    """`Put the A section before the B section`."""
+    text = clause.strip()
+    m = _ORDER_BEFORE_RE.search(text) or _ORDER_MODAL_RE.search(text)
+    if not m:
+        return None
+    first, second = m.group("a").strip(), m.group("b").strip()
+    if m.group("rel").lower() in ("after", "following"):
+        first, second = second, first
+    return [
+        _det(
+            f"The {first} section must come before the {second} section",
+            "required_section",
+            {"headings": [first, second], "ordered": True},
+            Category.STRUCTURE,
+            Severity.MAJOR,
+            "both headings must exist and appear in this order",
+        )
+    ]
+
+
+_FACT_VALUE = r"(?P<v>[^.;]*\d[^.;]*?)"
+_FACT_AS_RE = re.compile(
+    rf"^(?:please\s+)?(?:state|give|report|quote|write|put)\s+(?:that\s+)?the\s+"
+    rf"(?P<what>[\w\s-]{{2,40}}?)\s+(?:as|is|was|of)\s+{_FACT_VALUE}\s*$",
+    I,
+)
+_FACT_EVENT_RE = re.compile(
+    rf"^(?:please\s+)?(?:say|state|mention|note|write)\s+that\s+(?:the\s+)?"
+    rf"(?P<what>[\w\s-]{{2,40}}?)\s+(?:takes place|is held|will be held|happens|begins|starts|"
+    rf"ends|finishes|is scheduled|will take place)\s+(?:on|in|at|for|from)\s+{_FACT_VALUE}\s*$",
+    I,
+)
+_FACT_COUNT_RE = re.compile(
+    r"^(?:please\s+)?(?:say|state|mention|note|write)\s+that\s+"
+    r"(?P<v>\d[\d,]*(?:\.\d+)?\s+[A-Za-z][\w-]*)\b",
+    I,
+)
+
+
+def match_stated_fact(clause: str, chunk: _Chunk) -> list[Draft] | None:
+    """`State the total cost as 19,700 pounds`: the figure must appear as written."""
+    for rx in (_FACT_AS_RE, _FACT_EVENT_RE, _FACT_COUNT_RE):
+        m = rx.search(clause.strip())
+        if m:
+            value = m.group("v").strip().strip("\"'“”").rstrip(",")
+            if not re.search(r"\d", value) or len(value.split()) > 6:
+                return None
+            return [
+                _det(
+                    f'State "{value}"',
+                    "required_text",
+                    {"values": [value], "whole_word": True},
+                    Category.CONTENT,
+                    Severity.MAJOR,
+                    "the figure must appear exactly as written",
+                )
+            ]
+    return None
+
+
+_SPELLING_RE = re.compile(
+    r"\b(?P<v>British|UK|U\.K\.|American|US|U\.S\.)\s+(?:English|spellings?)\b|"
+    r"\bspell(?:ing)?\s+(?:words?\s+)?(?:in|the)\s+(?P<v2>British|American)\b",
+    I,
+)
+_LEAD_VERB_RE = re.compile(
+    r"^(?:please\s+)?(?:write|use|spell|keep|stick to|follow|adopt|ensure|make sure)\b|"
+    r"\b(?:must|should|need to|needs to|has to|shall)\b",
+    I,
+)
+
+
+def match_spelling_variant(clause: str, chunk: _Chunk) -> list[Draft] | None:
+    """`Write in British English`, `Use US spelling throughout`."""
+    m = _SPELLING_RE.search(clause)
+    if not m or not _LEAD_VERB_RE.search(clause):
+        return None
+    word = (m.group("v") or m.group("v2")).lower().replace(".", "")
+    variant = "british" if word in ("british", "uk") else "american"
+    return [
+        _det(
+            f"Use {variant.capitalize()} spelling",
+            "spelling_variant",
+            {"variant": variant},
+            Category.STYLE,
+            Severity.MINOR,
+            "word-list check for the other variant's spellings",
+        )
+    ]
+
+
+_PLACEHOLDER_RE = re.compile(r"\bplaceholders?\b", I)
+_PLACEHOLDER_NEG_RE = re.compile(
+    r"\b(?:no|without|avoid|remove|free of|not leave|not include|not contain|not have|never)\b",
+    I,
+)
+_PLACEHOLDER_PATTERNS = [
+    r"\[\s*(?:tbc|tbd|todo|to be (?:confirmed|determined|added|completed)|insert\b[^\]]*|"
+    r"add\b[^\]]*\bhere|placeholder\b[^\]]*|your\b[^\]]*|name|date|xx+|\.{3}|…)\s*\]",
+    r"<\s*(?:insert|add|your)\b[^>]*>",
+    r"\b(?:TBC|TBD)\b",
+    r"lorem ipsum",
+]
+
+
+def match_placeholders(clause: str, chunk: _Chunk) -> list[Draft] | None:
+    """`Leave no placeholder text such as [TBC]`."""
+    if not _PLACEHOLDER_RE.search(clause) or not _PLACEHOLDER_NEG_RE.search(clause):
+        return None
+    return [
+        _det(
+            "No placeholder text",
+            "forbidden_regex",
+            {"patterns": _PLACEHOLDER_PATTERNS, "flags": ["ignorecase"]},
+            Category.CONTENT,
+            Severity.MAJOR,
+            "bracketed placeholders such as [TBC] or [insert name], TBC/TBD, and lorem ipsum",
+        )
+    ]
+
+
+_CLOSING_RE = re.compile(
+    r"^(?:please\s+)?(?:finish|end|close|conclude|wrap up)\b.*?\b(?:with|in)\s+(?:an?\s+|the\s+)?"
+    r"(?:(?:short|brief|concise|clear|strong|final)\s+)*conclusions?\b",
+    I,
+)
+
+
+def match_closing_conclusion(clause: str, chunk: _Chunk) -> list[Draft] | None:
+    """`Finish with a short conclusion`: the heading must exist."""
+    if not _CLOSING_RE.search(clause.strip()):
+        return None
+    return [
+        Draft(
+            "Include a Conclusion section",
+            "a Conclusion heading must be present",
+            "required_section",
+            {"headings": [["Conclusion", "Conclusions"]]},
+            Category.STRUCTURE,
+            Severity.MAJOR,
+            D.DETERMINISTIC,
+            "Only the presence of the heading is checked, not that it comes last or is short.",
+        )
+    ]
+
+
+_TERM_POS_RE = re.compile(
+    r"^(?:please\s+)?(?:mention|include|name|introduce|state|refer to|use)\s+(?:the\s+)?(?P<t>.+?)\s+"
+    r"(?:in|within|inside)\s+(?:the\s+)?(?P<w>opening|first|introductory|final|last|closing)\s+"
+    r"paragraph\s*$",
+    I,
+)
+
+
+def match_term_position(clause: str, chunk: _Chunk) -> list[Draft] | None:
+    """`Mention the Project Kestrel in the opening paragraph`."""
+    m = _TERM_POS_RE.search(clause.strip())
+    if not m:
+        return None
+    term = m.group("t").strip().strip("\"'“”")
+    if not term or len(term.split()) > 6:
+        return None
+    first = m.group("w").lower() in ("opening", "first", "introductory")
+    where = "first_paragraph" if first else "last_paragraph"
+    return [
+        _det(
+            f'Mention "{term}" in the {"opening" if first else "final"} paragraph',
+            "required_text",
+            {"values": [term], "within": where},
+            Category.TERMINOLOGY,
+            Severity.MAJOR,
+            f"the term must be in the {where.replace('_', ' ')} (headings and lists do not count)",
+        )
+    ]
+
+
+_CITE_STYLE_RE = re.compile(
+    r"\b(?P<kind>numbered|numeric|author[- ](?:and|&)[- ]year|author[- ]date|parenthetical)\s+"
+    r"(?:in[- ]text\s+)?citations?\b",
+    I,
+)
+_NUMERIC_CITE = r"\[\s*\d+(?:\s*[,–-]\s*\d+)*\s*\]"
+_AUTHOR_YEAR_CITE = (
+    r"\(\s*(?-i:[A-Z])[\w'’-]+(?:\s+(?:and|&)\s+(?-i:[A-Z])[\w'’-]+|\s+et al\.?)?,?\s+"
+    r"(?:19|20)\d{2}[a-z]?(?:\s*[,;:]\s*[^()]{0,40})?\s*\)"
+)
+
+
+def match_citation_style(clause: str, chunk: _Chunk) -> list[Draft] | None:
+    """`Use numbered citations in square brackets, such as [1]`."""
+    m = _CITE_STYLE_RE.search(clause)
+    if not m or not _LEAD_VERB_RE.search(clause):
+        return None
+    numbered = m.group("kind").lower() in ("numbered", "numeric")
+    pattern = _NUMERIC_CITE if numbered else _AUTHOR_YEAR_CITE
+    label = "numbered [1]" if numbered else "author-year (Smith, 2020)"
+    return [
+        _det(
+            f"Cite sources in {label} form",
+            "required_regex",
+            {"pattern": pattern},
+            Category.FORMATTING,
+            Severity.MAJOR,
+            f"at least one {label} citation must appear",
+        )
+    ]
+
+
+_BULLET_LIST_RE = re.compile(
+    rf"\b(?P<kind>bulleted|bullet|numbered)\s+list\s+(?:of|with|containing)\s+"
+    rf"(?P<q>at least|at most|no more than|no fewer than|exactly|precisely)\s+(?P<n>{NUM})\s+"
+    rf"(?:[\w-]+\s+){{0,2}}?(?:points|items|entries|actions|bullets|steps)\b",
+    I,
+)
+
+
+def match_bulleted_list_count(clause: str, chunk: _Chunk) -> list[Draft] | None:
+    """`Include a bulleted list of exactly 5 action points`."""
+    m = _BULLET_LIST_RE.search(clause)
+    if not m:
+        return None
+    kind, delta = _BOUND_KIND[m.group("q").lower()]
+    element = "numbered_items" if m.group("kind").lower() == "numbered" else "bullets"
+    draft = _element_draft(element, {kind: to_int(m.group("n")) + delta}, element)
+    draft.notes = "Every bullet in the document is counted, not only those in one list."
+    return [draft]
+
+
 # Matchers run in this order. Specific patterns come before general ones.
 MATCHERS: list[Matcher] = [
     match_preservation,
     match_title,
+    match_section_order,
+    match_stated_fact,
+    match_spelling_variant,
+    match_placeholders,
+    match_closing_conclusion,
+    match_term_position,
+    match_citation_style,
+    match_bulleted_list_count,
     match_word_count,
     match_unsupported_length,
     match_forbidden_element,

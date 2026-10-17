@@ -9,6 +9,7 @@ from specguard.rules import (  # noqa: F401  (imported for registration)
     regex,
     required_text,
     sections,
+    spelling,
     word_count,
 )
 from specguard.rules.base import (

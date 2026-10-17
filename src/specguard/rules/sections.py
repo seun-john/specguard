@@ -22,6 +22,7 @@ class _Config:
     require: str
     exact: bool
     case_sensitive: bool
+    ordered: bool
 
 
 @register_rule
@@ -35,10 +36,14 @@ class RequiredSectionRule(RuleChecker):
         "exact": "Heading text must equal the name, ignoring numbering such as '2.1' and "
         "case (default true). When false, the name may appear inside a longer heading.",
         "case_sensitive": "Compare case exactly (default false).",
+        "ordered": "The headings must appear in the order listed (default false). Needs "
+        "`require: all`.",
     }
 
     def parse(self, parameters: Mapping[str, Any]) -> _Config:
-        reject_unknown(parameters, ("headings", "heading", "require", "exact", "case_sensitive"))
+        reject_unknown(
+            parameters, ("headings", "heading", "require", "exact", "case_sensitive", "ordered")
+        )
         raw = parameters.get("headings", parameters.get("heading"))
         if raw is None:
             raise ParameterError("'headings' is required")
@@ -57,12 +62,16 @@ class RequiredSectionRule(RuleChecker):
                     "each heading must be a string or a list of alternative strings"
                 )
             groups.append(list(names))
-        return _Config(
+        cfg = _Config(
             groups=groups,
             require=get_choice(parameters, "require", ("all", "any"), "all"),
             exact=get_bool(parameters, "exact", True),
             case_sensitive=get_bool(parameters, "case_sensitive", False),
+            ordered=get_bool(parameters, "ordered", False),
         )
+        if cfg.ordered and cfg.require != "all":
+            raise ParameterError("'ordered' needs require: all")
+        return cfg
 
     def check(self, document: Document, requirement: Requirement) -> CheckResult:
         cfg = self.parse(requirement.parameters)
@@ -74,10 +83,12 @@ class RequiredSectionRule(RuleChecker):
             return have == want if cfg.exact else want in have
 
         found: list[tuple[str, str, Location, bool]] = []  # group label, heading, loc, inferred
+        positions: list[int] = []
         missing: list[str] = []
         for group in cfg.groups:
             label = " / ".join(group)
             hit = None
+            position = 0
             for h in document.headings:
                 if any(matches(h.text, n) for n in group):
                     hit = (
@@ -86,6 +97,7 @@ class RequiredSectionRule(RuleChecker):
                         Location(line=h.line, paragraph=h.paragraph, heading=h.text),
                         False,
                     )
+                    position = h.position
                     break
             if hit is None:
                 # Plain text has no heading markup; accept a standalone short line that
@@ -98,9 +110,11 @@ class RequiredSectionRule(RuleChecker):
                             Location(line=p.line, paragraph=p.index, heading=p.text),
                             True,
                         )
+                        position = p.position
                         break
             if hit:
                 found.append(hit)
+                positions.append(position)
             else:
                 missing.append(label)
 
@@ -114,8 +128,29 @@ class RequiredSectionRule(RuleChecker):
             evidence.append(f'Found "{heading}" for {label} at {loc.describe()}{note}')
         evidence += [f"Not found: {m}" for m in missing]
         ok = not missing if cfg.require == "all" else bool(found)
+        out_of_order = ok and cfg.ordered and positions != sorted(positions)
+        if cfg.ordered:
+            expected += " (in this order)"
         confidence = 0.8 if any(f[3] for f in found) else 1.0
 
+        if out_of_order:
+            actual_order = [
+                f[0] for _, f in sorted(zip(positions, found, strict=True), key=lambda t: t[0])
+            ]
+            return self.failed(
+                requirement,
+                "Sections are not in the required order.",
+                expected=expected,
+                actual="Order found: " + ", ".join(actual_order),
+                evidence=evidence,
+                locations=[f[2] for f in found],
+                remediation_hint="Move the sections so they appear in the order required.",
+                details={
+                    "found": [f[0] for f in found],
+                    "missing": [],
+                    "order_found": actual_order,
+                },
+            )
         if ok:
             return self.passed(
                 requirement,

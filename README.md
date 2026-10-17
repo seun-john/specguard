@@ -177,11 +177,12 @@ Without `--spec`, SpecGuard reads `specguard.yml` in the current folder.
 | --- | --- |
 | `word_count` | Minimum, maximum, exact or ranged length; can exclude sections such as References. |
 | `forbidden_text` | Listed words or phrases must not appear. Case and whole-word options. |
-| `required_text` | Listed words or phrases must appear (all, or any). |
+| `required_text` | Listed words or phrases must appear (all, or any); `within: first_paragraph` or `last_paragraph` limits where. |
 | `forbidden_regex` / `required_regex` | Regular expressions, run under a timeout. |
 | `occurrences` | A word, phrase or pattern must occur exactly / at least / at most / between N times. |
 | `element_count` | Count bullets, numbered items, headings, tables, code blocks, paragraphs, references. |
-| `required_section` | Named headings must exist; alternatives, exact or contains, case options. |
+| `required_section` | Named headings must exist; alternatives, exact or contains, case options; `ordered: true` also requires them in the order listed. |
+| `spelling_variant` | British or American spelling, by a word list of common pairs. A failure is reliable; a pass means only that none of the listed words were found, so it has lower confidence. Words inside quotation marks are reported, not counted. |
 | `forbidden_punctuation` | Only the marks you list; optional `max_allowed`. |
 | `preserve_text` | Protected text must appear unchanged; shows a word-level diff when it does not. |
 | `file_type` | Expected file extension. |
@@ -208,10 +209,18 @@ Not supported yet: PDF, PPTX, HTML, OCR. Word text boxes, headers, footers, foot
 | "Include at least 30 references", "Use exactly 5 bullet points" | `element_count` |
 | "Mention climate change at least twice" | `occurrences` |
 | `Preserve the following text exactly: "..."` | `preserve_text` |
+| "Put the A section before the B section" | `required_section` with `ordered: true` |
+| "State the total cost as 19,700 pounds", "Say that the event takes place on 5 May" | `required_text` for the figure as written |
+| "Write in British English", "Use US spelling" | `spelling_variant` |
+| "Leave no placeholder text such as [TBC]" | `forbidden_regex` |
+| "Finish with a short conclusion" | `required_section` (the heading only; position and length are not checked) |
+| "Mention the X in the opening paragraph" | `required_text` with `within` |
+| "Use numbered citations, such as [1]" | `required_regex` |
+| "Include a bulleted list of exactly 5 action points" | `element_count` (counts every bullet in the document) |
 
 Anything else that reads like an instruction is kept and classified, never guessed:
 
-- `semantic`: needs language understanding ("Use British English", "Use strong academic reasoning").
+- `semantic`: needs language understanding ("Keep the tone formal", "Write for a general reader", "Use strong academic reasoning").
 - `manual`: needs a person, or the brief is ambiguous ("visually appealing", "a 1,500-word essay", "do not modify the research questions" with no text supplied).
 - `unsupported`: testable in principle, but no checker exists yet (page limits, fonts, APA).
 

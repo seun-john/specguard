@@ -4,6 +4,9 @@ All notable changes are recorded here. This project follows [Semantic Versioning
 
 ## Unreleased
 
+Extraction now reads more instructions as tests instead of leaving them unverified: section order (`required_section` gains `ordered`), a stated figure or date that must appear as written, British or American spelling (new `spelling_variant` checker), placeholder text such as `[TBC]`, a closing Conclusion heading, a term in the opening or final paragraph (`required_text` gains `within`), numbered or author-year citations, and `a bulleted list of exactly N points`.
+`spelling_variant` is a word-list check, not a spell checker: a failure is reliable, a pass has confidence 0.75 and says how many pairs were checked. Spellings inside quotation marks are listed in the evidence but not counted. Oxford `-ize` is accepted as British. This changes the earlier rule that `Use British English` is always semantic.
+Fixed `Include a bulleted list of exactly 5 action points` being read as an instruction to preserve text; `exactly` followed by a number is no longer a preservation cue.
 ### Added
 
 - A `coverage` block in every audit report (JSON, Markdown and terminal): requirements decided and undecided, the reasons (`semantic_judgement`, `human_judgement`, `no_checker`, `checker_error`), and the number switched off. No existing field changed.

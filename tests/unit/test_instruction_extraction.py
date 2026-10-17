@@ -279,7 +279,6 @@ class TestSubjectiveRequirementsAreNeverDeterministic:
             "Make this highly engaging.",
             "Write like a master's student.",
             "Use strong academic reasoning.",
-            "Use British English.",
             "Include all five research objectives.",
             "Maintain a professional tone.",
         ],

@@ -20,6 +20,7 @@ class _Config:
     require: str
     case_sensitive: bool
     whole_word: bool
+    within: str
     scope: Scope
 
 
@@ -32,24 +33,48 @@ class RequiredTextRule(RuleChecker):
         "require": "`all` (default) or `any`.",
         "case_sensitive": "Match case exactly (default false).",
         "whole_word": "Only match whole words (default false).",
+        "within": "`document` (default), `first_paragraph` or `last_paragraph`: where the text "
+        "must appear. Headings, lists, tables and code do not count as paragraphs.",
         "exclude_code_blocks / exclude_sections": "Skip parts of the document.",
     }
 
     def parse(self, parameters: Mapping[str, Any]) -> _Config:
         reject_unknown(
-            parameters, ("values", "value", "require", "case_sensitive", "whole_word", *Scope.KEYS)
+            parameters,
+            ("values", "value", "require", "case_sensitive", "whole_word", "within", *Scope.KEYS),
         )
         return _Config(
             values=get_str_list(parameters, "values", "value"),
             require=get_choice(parameters, "require", ("all", "any"), "all"),
             case_sensitive=get_bool(parameters, "case_sensitive", False),
             whole_word=get_bool(parameters, "whole_word", False),
+            within=get_choice(
+                parameters, "within", ("document", "first_paragraph", "last_paragraph"), "document"
+            ),
             scope=Scope.from_params(parameters),
         )
 
     def check(self, document: Document, requirement: Requirement) -> CheckResult:
         cfg = self.parse(requirement.parameters)
         units, notes = cfg.scope.select(document)
+        if cfg.within != "document":
+            body = [
+                p
+                for p in document.paragraphs
+                if p.kind == "paragraph" and not p.heading_candidate and p.text.strip()
+            ]
+            if not body:
+                return self.unverified(
+                    requirement,
+                    "The document has no body paragraph to look in.",
+                    expected=f"Text in the {cfg.within.replace('_', ' ')}",
+                )
+            target = body[0] if cfg.within == "first_paragraph" else body[-1]
+            units = [u for u in units if u.position == target.position and u.kind == "paragraph"]
+            notes = [
+                *notes,
+                f"Looked only in the {cfg.within.replace('_', ' ')} (paragraph {target.index}).",
+            ]
         hits = find_literals(
             units, cfg.values, case_sensitive=cfg.case_sensitive, whole_word=cfg.whole_word
         )
