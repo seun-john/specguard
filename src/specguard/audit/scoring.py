@@ -50,7 +50,10 @@ def compute_coverage(
         elif status is Status.ERROR:
             reasons["checker_error"] = reasons.get("checker_error", 0) + 1
         else:
-            reason = _UNVERIFIED_REASON.get(e.requirement.verification_type, "no_checker")
+            vtype = e.requirement.verification_type
+            reason = "no_checker"
+            if vtype is not None:
+                reason = _UNVERIFIED_REASON.get(vtype, reason)
             reasons[reason] = reasons.get(reason, 0) + 1
     notes = []
     if not_extracted:
