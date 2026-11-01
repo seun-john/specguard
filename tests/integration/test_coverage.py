@@ -193,7 +193,9 @@ class TestNotExtracted:
     def test_a_specification_without_the_field_still_loads(self) -> None:
         spec = parse_specification({"requirements": [req("A", verification_type="manual")]})
         assert spec.not_extracted == []
-        assert api.audit_document(spec, md("x")).coverage.notes == []
+        coverage = api.audit_document(spec, md("x")).coverage
+        assert coverage is not None
+        assert coverage.notes == []
 
     def test_extract_command_says_how_many_sentences_it_left_out(self, tmp_path: Path) -> None:
         brief = tmp_path / "brief.txt"
